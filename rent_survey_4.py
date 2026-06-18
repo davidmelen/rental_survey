@@ -3,6 +3,9 @@ from bs4 import BeautifulSoup
 import re
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import time
+from datetime import datetime
+import openpyxl
+from openpyxl.styles import Font
 
 # --- 1. User Input: Area ---
 valid_areas = ["M27", "M28", "M30", "M5"]
@@ -223,6 +226,34 @@ else:
 
 print("=" * 60)
 print("Use Ctrl + right click to view web page")
+
+# --- Excel Export ---
+if survey_results:
+    save = input("\nSave results to Excel? (y/n): ").strip().lower()
+    if save == 'y':
+        beds_label = f"{min_bedrooms}bed" if min_bedrooms == max_bedrooms else f"{min_bedrooms}-{max_bedrooms}bed"
+        timestamp = datetime.now().strftime("%Y%m%d%H%M")
+        filename = f"exports/{timestamp}_{area}_{selected_prop_type_param}_{beds_label}_survey.xlsx"
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Survey Results"
+
+        headers = ["Address", "Type", "Bedrooms", "Rent (str)", "Rent (pcm)"]
+        ws.append(headers)
+        for cell in ws[1]:
+            cell.font = Font(bold=True)
+
+        for prop in survey_results:
+            ws.append([prop["address"], prop["type"], prop["bedrooms"], prop["rent_str"], prop["rent_val"]])
+
+        # Auto-size columns
+        for col in ws.columns:
+            max_len = max(len(str(cell.value)) for cell in col if cell.value)
+            ws.column_dimensions[col[0].column_letter].width = max_len + 2
+
+        wb.save(filename)
+        print(f"Saved: {filename}")
 
 # Clean URL for display
 display_query = query.copy()
