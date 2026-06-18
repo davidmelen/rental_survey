@@ -54,11 +54,11 @@ max_bedrooms = get_valid_int("Enter maximum bedrooms: ")
 
 # --- 4. Select Base URL ---
 if area == "M27":
-    base_url = "https://www.rightmove.co.uk/property-to-rent/find.html?searchLocation=M27&useLocationIdentifier=true&locationIdentifier=OUTCODE%5E1582&rent=To+rent&radius=0.0&minBedrooms=2&maxBedrooms=2&_includeLetAgreed=on&includeLetAgreed=true&index=0&sortType=6&channel=RENT&transactionType=LETTING&displayLocationIdentifier=M27&propertyTypes=terraced&furnishTypes=unfurnished%2CpartFurnished"
+    base_url = "https://www.rightmove.co.uk/property-to-rent/find.html?searchLocation=M27&useLocationIdentifier=true&locationIdentifier=OUTCODE%5E1582&rent=To+rent&radius=0.0&minBedrooms=2&maxBedrooms=2&_includeLetAgreed=true&includeLetAgreed=true&index=0&sortType=6&channel=RENT&transactionType=LETTING&displayLocationIdentifier=M27&propertyTypes=terraced&furnishTypes=unfurnished%2CpartFurnished"
 elif area == "M28":
-    base_url = "https://www.rightmove.co.uk/property-to-rent/find.html?searchLocation=M28&useLocationIdentifier=true&locationIdentifier=OUTCODE%5E1583&radius=0.0&minBedrooms=2&maxBedrooms=2&propertyTypes=terraced&_includeLetAgreed=on&includeLetAgreed=true&sortType=6&channel=RENT&transactionType=LETTING&displayLocationIdentifier=M28&furnishTypes=unfurnished%2CpartFurnished"
+    base_url = "https://www.rightmove.co.uk/property-to-rent/find.html?searchLocation=M28&useLocationIdentifier=true&locationIdentifier=OUTCODE%5E1583&radius=0.0&minBedrooms=2&maxBedrooms=2&propertyTypes=terraced&_includeLetAgreed=true&includeLetAgreed=true&sortType=6&channel=RENT&transactionType=LETTING&displayLocationIdentifier=M28&furnishTypes=unfurnished%2CpartFurnished"
 elif area == "M30":
-    base_url = "https://www.rightmove.co.uk/property-to-rent/find.html?searchLocation=M30&useLocationIdentifier=true&locationIdentifier=OUTCODE%5E1586&rent=To+rent&radius=0.0&minBedrooms=2&maxBedrooms=2&propertyTypes=terraced&_includeLetAgreed=on&includeLetAgreed=true&furnishTypes=unfurnished%2CpartFurnished&index=0&sortType=6&channel=RENT&transactionType=LETTING&displayLocationIdentifier=M30"
+    base_url = "https://www.rightmove.co.uk/property-to-rent/find.html?searchLocation=M30&useLocationIdentifier=true&locationIdentifier=OUTCODE%5E1586&rent=To+rent&radius=0.0&minBedrooms=2&maxBedrooms=2&propertyTypes=terraced&_includeLetAgreed=true&includeLetAgreed=true&furnishTypes=unfurnished%2CpartFurnished&index=0&sortType=6&channel=RENT&transactionType=LETTING&displayLocationIdentifier=M30"
 elif area == "M5":
     base_url = "https://www.rightmove.co.uk/property-to-rent/find.html?searchLocation=M5&useLocationIdentifier=true&locationIdentifier=OUTCODE%5E1600&radius=0.0&minBedrooms=2&maxBedrooms=2&propertyTypes=flat&_includeLetAgreed=on&includeLetAgreed=true&furnishTypes=unfurnished%2CpartFurnished&sortType=6&channel=RENT&transactionType=LETTING&displayLocationIdentifier=M5&index=0&minBathrooms=1&maxBathrooms=1&dontShow=student%2Cretirement%2ChouseShare"
 else:
@@ -177,17 +177,34 @@ while True:
                 if bedrooms == "0" or "Studio" in property_type:
                         bedrooms = "Studio"
 
+                # Date added or reduced
+                date_listed = "N/A"
+                date_span = listing.find("span", class_="MarketedBy_addedOrReduced__Vtc9o")
+                if date_span:
+                    date_match = re.search(r'(\d{2}/\d{2}/\d{4})', date_span.text)
+                    if date_match:
+                        date_listed = date_match.group(1)
+
+                # Property URL
+                property_url = "N/A"
+                link_tag = listing.find("a", {"data-testid": "property-details-lozenge"})
+                if link_tag and link_tag.get("href"):
+                    href = link_tag["href"]
+                    property_url = href if href.startswith("http") else f"https://www.rightmove.co.uk{href}"
+
                 if rent_str != "N/A":
                     match = re.search(r'£([\d,]+)', rent_str)
                     if match:
                         rent_amount = int(match.group(1).replace(",", ""))
-                        
+
                         survey_results.append({
                             "address": address,
                             "type": property_type,
                             "bedrooms": bedrooms,
+                            "date_listed": date_listed,
                             "rent_str": rent_str,
-                            "rent_val": rent_amount
+                            "rent_val": rent_amount,
+                            "url": property_url
                         })
                         items_on_page += 1
 
@@ -239,13 +256,31 @@ if survey_results:
         ws = wb.active
         ws.title = "Survey Results"
 
-        headers = ["Address", "Type", "Bedrooms", "Rent (str)", "Rent (pcm)"]
+        headers = ["Address", "Type", "Bedrooms", "Date", "Rent (str)", "Rent (pcm)", "URL"]
         ws.append(headers)
         for cell in ws[1]:
             cell.font = Font(bold=True)
 
-        for prop in survey_results:
-            ws.append([prop["address"], prop["type"], prop["bedrooms"], prop["rent_str"], prop["rent_val"]])
+        for row_num, prop in enumerate(survey_results, start=2):
+            ws.append([prop["address"], prop["type"], prop["bedrooms"], prop["date_listed"], prop["rent_str"], prop["rent_val"], prop["url"]])
+            if prop["url"] != "N/A":
+                url_cell = ws.cell(row=row_num, column=7)
+                url_cell.hyperlink = prop["url"]
+                url_cell.value = "View listing"
+                url_cell.font = Font(color="0000FF", underline="single")
+
+        # Average row (blank row gap then average under Rent (pcm) column F)
+        last_data_row = 1 + len(survey_results)
+        avg_row = last_data_row + 2
+        ws.cell(row=avg_row, column=5).value = "Average:"
+        ws.cell(row=avg_row, column=5).font = Font(bold=True)
+        ws.cell(row=avg_row, column=6).value = f"=AVERAGE(F2:F{last_data_row})"
+        ws.cell(row=avg_row, column=6).font = Font(bold=True)
+
+        # Apply £ UK currency format to all Rent (pcm) values and average
+        gbp_format = '[$£-809]#,##0.00'
+        for row in range(2, avg_row + 1):
+            ws.cell(row=row, column=6).number_format = gbp_format
 
         # Auto-size columns
         for col in ws.columns:
