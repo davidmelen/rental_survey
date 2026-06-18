@@ -185,6 +185,10 @@ while True:
                     if date_match:
                         date_listed = date_match.group(1)
 
+                # Let Agreed status
+                let_agreed_tag = listing.find("span", {"data-testid": "property-tag-Let agreed"})
+                let_agreed = "Let agreed" if let_agreed_tag else ""
+
                 # Property URL
                 property_url = "N/A"
                 link_tag = listing.find("a", {"data-testid": "property-details-lozenge"})
@@ -202,6 +206,7 @@ while True:
                             "type": property_type,
                             "bedrooms": bedrooms,
                             "date_listed": date_listed,
+                            "let_agreed": let_agreed,
                             "rent_str": rent_str,
                             "rent_val": rent_amount,
                             "url": property_url
@@ -256,31 +261,31 @@ if survey_results:
         ws = wb.active
         ws.title = "Survey Results"
 
-        headers = ["Address", "Type", "Bedrooms", "Date", "Rent (str)", "Rent (pcm)", "URL"]
+        headers = ["Address", "Type", "Bedrooms", "Date", "Let Agreed", "Rent (str)", "Rent (pcm)", "URL"]
         ws.append(headers)
         for cell in ws[1]:
             cell.font = Font(bold=True)
 
         for row_num, prop in enumerate(survey_results, start=2):
-            ws.append([prop["address"], prop["type"], prop["bedrooms"], prop["date_listed"], prop["rent_str"], prop["rent_val"], prop["url"]])
+            ws.append([prop["address"], prop["type"], prop["bedrooms"], prop["date_listed"], prop["let_agreed"], prop["rent_str"], prop["rent_val"], prop["url"]])
             if prop["url"] != "N/A":
-                url_cell = ws.cell(row=row_num, column=7)
+                url_cell = ws.cell(row=row_num, column=8)
                 url_cell.hyperlink = prop["url"]
                 url_cell.value = "View listing"
                 url_cell.font = Font(color="0000FF", underline="single")
 
-        # Average row (blank row gap then average under Rent (pcm) column F)
+        # Average row (blank row gap then average under Rent (pcm) column G)
         last_data_row = 1 + len(survey_results)
         avg_row = last_data_row + 2
-        ws.cell(row=avg_row, column=5).value = "Average:"
-        ws.cell(row=avg_row, column=5).font = Font(bold=True)
-        ws.cell(row=avg_row, column=6).value = f"=AVERAGE(F2:F{last_data_row})"
+        ws.cell(row=avg_row, column=6).value = "Average:"
         ws.cell(row=avg_row, column=6).font = Font(bold=True)
+        ws.cell(row=avg_row, column=7).value = f"=AVERAGE(G2:G{last_data_row})"
+        ws.cell(row=avg_row, column=7).font = Font(bold=True)
 
         # Apply £ UK currency format to all Rent (pcm) values and average
         gbp_format = '[$£-809]#,##0.00'
         for row in range(2, avg_row + 1):
-            ws.cell(row=row, column=6).number_format = gbp_format
+            ws.cell(row=row, column=7).number_format = gbp_format
 
         # Auto-size columns
         for col in ws.columns:
